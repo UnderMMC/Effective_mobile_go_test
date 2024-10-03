@@ -18,7 +18,7 @@ func (r *PostgresSongRepository) GetAll(filter string) ([]entity.Song, error) {
 	var rows *sql.Rows
 	var err error
 	if filter == "" {
-		rows, err = r.db.Query("SELECT * FROM music")
+		rows, err = r.db.Query("SELECT * FROM music") // ORDER BY song_id LIMIT $1 OFFSET $2", limit, offset)
 	} else {
 		query := `SELECT * FROM music WHERE CONCAT_WS(' ', song_id::text, performer, song_name, release_data, lyric, link) LIKE '%' || $1 || '%'`
 		rows, err = r.db.Query(query, filter)
@@ -30,7 +30,7 @@ func (r *PostgresSongRepository) GetAll(filter string) ([]entity.Song, error) {
 
 	for rows.Next() {
 		var song entity.Song
-		err := rows.Scan(&song.ID, &song.Group, &song.Song, &song.ReleaseDate, &song.Text, &song.Link)
+		err := rows.Scan(&song.ID, &song.Group, &song.Song)
 		if err != nil {
 			return nil, err
 		}
