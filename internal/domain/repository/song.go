@@ -61,6 +61,15 @@ func (r *PostgresSongRepository) Delete(group string, song string, id int) error
 	return nil
 }
 
+func (r *PostgresSongRepository) Update(song entity.SongDetails, id int) error {
+	query := `UPDATE music SET release_data = $1, lyric = $2, link = $3 WHERE song_id = $4`
+	_, err := r.db.Exec(query, song.ReleaseDate, song.Text, song.Link, id)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 //func (r *PostgresSongRepository) GetSongID(song entity.Song) (int, error) {
 //	err := r.db.QueryRow("SELECT id FROM music WHERE performer=$1 AND song_name=$2", song.Group, song.Song).Scan(&song.ID)
 //	if err != nil {

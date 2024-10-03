@@ -21,7 +21,7 @@ type SongService interface {
 	GetSongs(filter string) ([]entity.Song, error)
 	AddSong(song entity.Song) (int, error)
 	DeleteSong(group string, song string, id int) error
-	//UpdateSong(song entity.Song) error
+	UpdateSong(song entity.SongDetails, id int) error
 }
 
 type SongApp struct {
@@ -178,6 +178,27 @@ func (a *SongApp) DeleteSongHandler(w http.ResponseWriter, r *http.Request) {
 	err := a.serv.DeleteSong(group, song, id)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		log.Println(err)
+	}
+}
+
+func (a *SongApp) UpdateSongHandler(w http.ResponseWriter, r *http.Request) {
+	var song entity.SongDetails
+	idStr := r.URL.Query().Get("id")
+	id, _ := strconv.Atoi(idStr)
+	if id == 0 || id < 0 {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+	}
+	err := json.NewDecoder(r.Body).Decode(&song)
+	if err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	err = a.serv.UpdateSong(song, id)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		log.Println(err)
 	}
 }
 
@@ -203,6 +224,7 @@ func (a *SongApp) Run() {
 	r.HandleFunc("/songs/add", a.AddSongHandler).Methods("POST")
 	r.HandleFunc("/songs/info", a.InfoSongHandler).Methods("GET")
 	r.HandleFunc("/songs/delete", a.DeleteSongHandler).Methods("GET")
+	r.HandleFunc("/songs/update", a.UpdateSongHandler).Methods("POST")
 
 	log.Println("Starting HTTP server on port :8080")
 	log.Fatal(http.ListenAndServe(":8080", r))
