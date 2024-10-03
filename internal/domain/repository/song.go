@@ -30,7 +30,8 @@ func (r *PostgresSongRepository) GetAll(filter string) ([]entity.Song, error) {
 
 	for rows.Next() {
 		var song entity.Song
-		err := rows.Scan(&song.ID, &song.Group, &song.Song)
+		var songd entity.SongDetails
+		err := rows.Scan(&song.ID, &song.Group, &song.Song, &songd.ReleaseDate, &songd.Text, &songd.Link)
 		if err != nil {
 			return nil, err
 		}

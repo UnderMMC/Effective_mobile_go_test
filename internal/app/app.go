@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 )
 
@@ -107,8 +108,17 @@ func (a *SongApp) AddSongHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	// http.Error(w, "Ok", http.StatusOK)
-	resp, err := http.Get("http://localhost:8080/song/info?group=" + song.Group + "&song=" + song.Song)
+
+	if song.Group == "" || song.Song == "" {
+		http.Error(w, "Group or Song cannot be empty", http.StatusBadRequest)
+		return
+	}
+
+	// Кодирование параметров для URL
+	groupEncoded := url.QueryEscape(song.Group)
+	songEncoded := url.QueryEscape(song.Song)
+
+	resp, err := http.Get("http://localhost:8080/songs/info?group=" + groupEncoded + "&song=" + songEncoded)
 	if err != nil {
 		http.Error(w, "Failed to fetch song info", http.StatusInternalServerError)
 		log.Println(err)
@@ -131,9 +141,6 @@ func (a *SongApp) AddSongHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(body)
-	/*w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(song.ID)*/
-
 }
 
 func (a *SongApp) InfoSongHandler(w http.ResponseWriter, r *http.Request) {
@@ -145,6 +152,7 @@ func (a *SongApp) InfoSongHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Проверяем, существует ли песня в карте.
 	songDetail, exists := songs[song]
 	if !exists {
 		http.Error(w, "Song not found", http.StatusNotFound)
@@ -179,7 +187,7 @@ func (a *SongApp) Run() {
 
 	r.HandleFunc("/songs", a.GetSongsHandler).Methods("GET")
 	r.HandleFunc("/songs/add", a.AddSongHandler).Methods("POST")
-	r.HandleFunc("/songs/info", a.InfoSongHandler).Methods("POST")
+	r.HandleFunc("/songs/info", a.InfoSongHandler).Methods("GET")
 	// r.HandleFunc("/songs/delete", a.GetSongsHandler).Methods("GET")
 
 	log.Println("Starting HTTP server on port :8080")
