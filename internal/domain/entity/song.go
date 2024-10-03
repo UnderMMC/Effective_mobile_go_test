@@ -1,7 +1,7 @@
 package entity
 
 type Song struct {
-	ID          int64  `json:"id"`
+	ID          int    `json:"id"`
 	Group       string `json:"group"`
 	Song        string `json:"song"`
 	ReleaseDate string `json:"release_date"`

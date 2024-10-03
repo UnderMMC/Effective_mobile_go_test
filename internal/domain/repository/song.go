@@ -44,9 +44,23 @@ func (r *PostgresSongRepository) GetAll(filter string) ([]entity.Song, error) {
 	return songs, nil
 }
 
-// func (r *PostgresSongRepository) GetByID(id int) (entity.Song, error) {}
+func (r *PostgresSongRepository) Add(song entity.Song) (int, error) {
+	err := r.db.QueryRow("INSERT INTO music (performer, song_name) VALUES ($1, $2) RETURNING song_id", song.Group, song.Song).Scan(&song.ID)
+	if err != nil {
+		return 0, err
+	}
+	return song.ID, nil
+}
 
-// func (r *PostgresSongRepository) Add(song entity.Song) (int, error) {}
+//func (r *PostgresSongRepository) GetSongID(song entity.Song) (int, error) {
+//	err := r.db.QueryRow("SELECT id FROM music WHERE performer=$1 AND song_name=$2", song.Group, song.Song).Scan(&song.ID)
+//	if err != nil {
+//		return 0, err
+//	}
+//	return song.ID, err
+//}
+
+// func (r *PostgresSongRepository) GetByID(id int) (entity.Song, error) {}
 
 // func (r *PostgresSongRepository) Update(song entity.Song) error {}
 

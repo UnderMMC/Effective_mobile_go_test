@@ -4,8 +4,9 @@ import "EffectiveMobile_Go/internal/domain/entity"
 
 type SongRepository interface {
 	GetAll(filter string) ([]entity.Song, error)
-	//GetByID(id int) (entity.Song, error)
-	//Add(song entity.Song) (int, error)
+	Add(song entity.Song) (int, error)
+	//GetSongIGetSongID(song entity.Song) (int, error)
+	// GetByID(id int) (entity.Song, error)
 	//Update(song entity.Song) error
 	//Delete(id int) error
 }
@@ -26,16 +27,16 @@ func (s *SongService) GetSongs(filter string) ([]entity.Song, error) {
 	return songs, nil
 }
 
-/*func (s *SongService) AddSong(song entity.Song) (int, error) {
-	// Здесь можно добавить валидацию данных песни перед добавлением
-	id, err := s.songRepo.Add(song)
+func (s *SongService) AddSong(song entity.Song) (int, error) {
+	var err error
+	song.ID, err = s.songRepo.Add(song)
 	if err != nil {
 		return 0, err
 	}
-	return id, nil
+	return song.ID, nil
 }
 
-func (s *SongService) UpdateSong(song entity.Song) error {
+/*func (s *SongService) UpdateSong(song entity.Song) error {
 	// Здесь можно добавить валидацию данных песни перед обновлением
 	err := s.songRepo.Update(song)
 	if err != nil {

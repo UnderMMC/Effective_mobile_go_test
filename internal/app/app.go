@@ -16,7 +16,7 @@ var db *sql.DB
 
 type SongService interface {
 	GetSongs(filter string) ([]entity.Song, error)
-	//AddSong(song entity.Song) (int, error)
+	AddSong(song entity.Song) (int, error)
 	//UpdateSong(song entity.Song) error
 	//DeleteSong(id int) error
 }
@@ -39,6 +39,24 @@ func (a *SongApp) GetSongsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (a *SongApp) AddSongHandler(w http.ResponseWriter, r *http.Request) {
+	var song entity.Song
+	err := json.NewDecoder(r.Body).Decode(&song)
+	if err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+	song.ID, err = a.serv.AddSong(song)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	http.Error(w, "Ok", http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(song.ID)
+
+}
+
 func New() *SongApp {
 	return &SongApp{}
 }
@@ -58,7 +76,7 @@ func (a *SongApp) Run() {
 	a.serv = SongServ
 
 	r.HandleFunc("/songs", a.GetSongsHandler).Methods("GET")
-	//r.HandleFunc("/songs/add", a.AddSongHandler).Methods("POST")
+	r.HandleFunc("/songs/add", a.AddSongHandler).Methods("POST")
 
 	log.Println("Starting HTTP server on port :8080")
 	log.Fatal(http.ListenAndServe(":8080", r))
