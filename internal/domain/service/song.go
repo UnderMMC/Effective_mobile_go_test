@@ -5,10 +5,10 @@ import "EffectiveMobile_Go/internal/domain/entity"
 type SongRepository interface {
 	GetAll(filter string) ([]entity.Song, error)
 	Add(song entity.Song) (int, error)
+	Delete(group string, song string, id int) error
 	//GetSongIGetSongID(song entity.Song) (int, error)
 	// GetByID(id int) (entity.Song, error)
 	//Update(song entity.Song) error
-	//Delete(id int) error
 }
 
 type SongService struct {
@@ -36,17 +36,17 @@ func (s *SongService) AddSong(song entity.Song) (int, error) {
 	return song.ID, nil
 }
 
-/*func (s *SongService) UpdateSong(song entity.Song) error {
-	// Здесь можно добавить валидацию данных песни перед обновлением
-	err := s.songRepo.Update(song)
+func (s *SongService) DeleteSong(group string, song string, id int) error {
+	err := s.songRepo.Delete(group, song, id)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *SongService) DeleteSong(id int) error {
-	err := s.songRepo.Delete(id)
+/*func (s *SongService) UpdateSong(song entity.Song) error {
+	// Здесь можно добавить валидацию данных песни перед обновлением
+	err := s.songRepo.Update(song)
 	if err != nil {
 		return err
 	}

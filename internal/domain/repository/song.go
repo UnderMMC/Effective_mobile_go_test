@@ -53,6 +53,14 @@ func (r *PostgresSongRepository) Add(song entity.Song) (int, error) {
 	return song.ID, nil
 }
 
+func (r *PostgresSongRepository) Delete(group string, song string, id int) error {
+	_, err := r.db.Exec("DELETE FROM music WHERE performer=$1 AND song_name=$2 AND song_id=$3", group, song, id)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 //func (r *PostgresSongRepository) GetSongID(song entity.Song) (int, error) {
 //	err := r.db.QueryRow("SELECT id FROM music WHERE performer=$1 AND song_name=$2", song.Group, song.Song).Scan(&song.ID)
 //	if err != nil {
@@ -64,5 +72,3 @@ func (r *PostgresSongRepository) Add(song entity.Song) (int, error) {
 // func (r *PostgresSongRepository) GetByID(id int) (entity.Song, error) {}
 
 // func (r *PostgresSongRepository) Update(song entity.Song) error {}
-
-// func (r *PostgresSongRepository) Delete(id int) error {}

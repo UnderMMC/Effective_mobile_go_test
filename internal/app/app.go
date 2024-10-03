@@ -20,8 +20,8 @@ var db *sql.DB
 type SongService interface {
 	GetSongs(filter string) ([]entity.Song, error)
 	AddSong(song entity.Song) (int, error)
+	DeleteSong(group string, song string, id int) error
 	//UpdateSong(song entity.Song) error
-	//DeleteSong(id int) error
 }
 
 type SongApp struct {
@@ -167,6 +167,20 @@ func (a *SongApp) InfoSongHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (a *SongApp) DeleteSongHandler(w http.ResponseWriter, r *http.Request) {
+	group := r.URL.Query().Get("group")
+	song := r.URL.Query().Get("song")
+	idStr := r.URL.Query().Get("id")
+	id, _ := strconv.Atoi(idStr)
+	if group == "" || song == "" || id == 0 || id < 0 {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+	}
+	err := a.serv.DeleteSong(group, song, id)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
 func New() *SongApp {
 	return &SongApp{}
 }
@@ -188,7 +202,7 @@ func (a *SongApp) Run() {
 	r.HandleFunc("/songs", a.GetSongsHandler).Methods("GET")
 	r.HandleFunc("/songs/add", a.AddSongHandler).Methods("POST")
 	r.HandleFunc("/songs/info", a.InfoSongHandler).Methods("GET")
-	// r.HandleFunc("/songs/delete", a.GetSongsHandler).Methods("GET")
+	r.HandleFunc("/songs/delete", a.DeleteSongHandler).Methods("GET")
 
 	log.Println("Starting HTTP server on port :8080")
 	log.Fatal(http.ListenAndServe(":8080", r))
