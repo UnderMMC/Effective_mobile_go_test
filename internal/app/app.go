@@ -22,6 +22,7 @@ type SongService interface {
 	AddSong(song entity.Song) (int, error)
 	DeleteSong(group string, song string, id int) error
 	UpdateSong(song entity.SongDetails, id int) error
+	GetSongLyricsPaginated(id, page, size int) ([]string, error)
 }
 
 type SongApp struct {
@@ -40,10 +41,8 @@ func (a *SongApp) GetSongsHandler(w http.ResponseWriter, r *http.Request) {
 	var songs []entity.Song
 	var err error
 
-	// Получаем фильтр
 	filter := r.URL.Query().Get("filter")
 
-	// Получаем все песни с учетом фильтра
 	songs, err = a.serv.GetSongs(filter)
 	if err != nil {
 		log.Println(err)
@@ -51,15 +50,12 @@ func (a *SongApp) GetSongsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Получаем параметры пагинации
 	pageStr := r.URL.Query().Get("page")
 	pageSizeStr := r.URL.Query().Get("pageSize")
 
-	// Устанавливаем значения по умолчанию
 	page := 1
 	pageSize := 5
 
-	// Преобразуем параметры из строки в int
 	if pageStr != "" {
 		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
 			page = p
@@ -71,11 +67,9 @@ func (a *SongApp) GetSongsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Расчет индексов для среза
 	start := (page - 1) * pageSize
 	end := start + pageSize
 
-	// Обеспечиваем корректные границы
 	if start > len(songs) {
 		start = len(songs)
 	}
@@ -83,13 +77,10 @@ func (a *SongApp) GetSongsHandler(w http.ResponseWriter, r *http.Request) {
 		end = len(songs)
 	}
 
-	// Срез песен в соответствии с пагинацией
 	paginatedSongs := songs[start:end]
 
-	// Установка заголовка
 	w.Header().Set("Content-Type", "application/json")
 
-	// Кодируем результат в JSON и отправляем
 	if err := json.NewEncoder(w).Encode(paginatedSongs); err != nil {
 		log.Println(err)
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
@@ -200,6 +191,39 @@ func (a *SongApp) UpdateSongHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		log.Println(err)
 	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Song updated successfully"))
+}
+
+func (a *SongApp) GetTextHandler(w http.ResponseWriter, r *http.Request) {
+	//var err error
+	idStr := r.URL.Query().Get("id")
+	pageStr := r.URL.Query().Get("page")
+	sizeStr := r.URL.Query().Get("size")
+
+	id, _ := strconv.Atoi(idStr)
+	page, _ := strconv.Atoi(pageStr)
+	size, _ := strconv.Atoi(sizeStr)
+
+	if id <= 0 || page < 0 || size <= 0 {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	//var text []string
+	text, err := a.serv.GetSongLyricsPaginated(id, page, size)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(text); err != nil {
+		log.Println(err)
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
 }
 
 func New() *SongApp {
@@ -225,6 +249,7 @@ func (a *SongApp) Run() {
 	r.HandleFunc("/songs/info", a.InfoSongHandler).Methods("GET")
 	r.HandleFunc("/songs/delete", a.DeleteSongHandler).Methods("GET")
 	r.HandleFunc("/songs/update", a.UpdateSongHandler).Methods("POST")
+	r.HandleFunc("/songs/text", a.GetTextHandler).Methods("GET")
 
 	log.Println("Starting HTTP server on port :8080")
 	log.Fatal(http.ListenAndServe(":8080", r))

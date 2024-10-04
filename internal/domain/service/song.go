@@ -7,8 +7,7 @@ type SongRepository interface {
 	Add(song entity.Song) (int, error)
 	Delete(group string, song string, id int) error
 	Update(song entity.SongDetails, id int) error
-	//GetSongIGetSongID(song entity.Song) (int, error)
-	// GetByID(id int) (entity.Song, error)
+	GetText(id, page, size int) ([]string, error)
 }
 
 type SongService struct {
@@ -50,4 +49,23 @@ func (s *SongService) UpdateSong(song entity.SongDetails, id int) error {
 		return err
 	}
 	return nil
+}
+
+func (s *SongService) GetSongLyricsPaginated(id, page, size int) ([]string, error) {
+	lyrics, err := s.songRepo.GetText(id, page, size)
+	if err != nil {
+		return nil, err
+	}
+
+	start := page * size
+	end := start + size
+
+	if start >= len(lyrics) {
+		return []string{}, nil
+	}
+	if end > len(lyrics) {
+		end = len(lyrics)
+	}
+
+	return lyrics[start:end], nil
 }
