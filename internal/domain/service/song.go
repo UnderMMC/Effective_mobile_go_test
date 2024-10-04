@@ -18,12 +18,23 @@ func NewSongService(songRepo SongRepository) *SongService {
 	return &SongService{songRepo: songRepo}
 }
 
-func (s *SongService) GetSongs(filter string) ([]entity.Song, error) {
+func (s *SongService) GetSongsPaginated(filter string, page, pageSize int) ([]entity.Song, error) {
 	songs, err := s.songRepo.GetAll(filter)
 	if err != nil {
 		return nil, err
 	}
-	return songs, nil
+
+	start := (page - 1) * pageSize
+	end := start + pageSize
+
+	if start > len(songs) {
+		start = len(songs)
+	}
+	if end > len(songs) {
+		end = len(songs)
+	}
+
+	return songs[start:end], nil
 }
 
 func (s *SongService) AddSong(song entity.Song) (int, error) {

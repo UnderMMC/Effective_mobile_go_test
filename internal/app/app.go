@@ -18,7 +18,7 @@ import (
 var db *sql.DB
 
 type SongService interface {
-	GetSongs(filter string) ([]entity.Song, error)
+	GetSongsPaginated(filter string, page, pageSize int) ([]entity.Song, error)
 	AddSong(song entity.Song) (int, error)
 	DeleteSong(group string, song string, id int) error
 	UpdateSong(song entity.SongDetails, id int) error
@@ -38,17 +38,9 @@ var songs = map[string]entity.SongDetails{
 }
 
 func (a *SongApp) GetSongsHandler(w http.ResponseWriter, r *http.Request) {
-	var songs []entity.Song
 	var err error
 
 	filter := r.URL.Query().Get("filter")
-
-	songs, err = a.serv.GetSongs(filter)
-	if err != nil {
-		log.Println(err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
 
 	pageStr := r.URL.Query().Get("page")
 	pageSizeStr := r.URL.Query().Get("pageSize")
@@ -67,21 +59,16 @@ func (a *SongApp) GetSongsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	start := (page - 1) * pageSize
-	end := start + pageSize
-
-	if start > len(songs) {
-		start = len(songs)
+	songs, err := a.serv.GetSongsPaginated(filter, page, pageSize)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
 	}
-	if end > len(songs) {
-		end = len(songs)
-	}
-
-	paginatedSongs := songs[start:end]
 
 	w.Header().Set("Content-Type", "application/json")
 
-	if err := json.NewEncoder(w).Encode(paginatedSongs); err != nil {
+	if err := json.NewEncoder(w).Encode(songs); err != nil {
 		log.Println(err)
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}
