@@ -4,10 +4,11 @@ import "EffectiveMobile_Go/internal/domain/entity"
 
 type SongRepository interface {
 	GetAll(filter string) ([]entity.Song, error)
-	Add(song entity.Song) (int, error)
+	Add(song entity.Song) error
 	Delete(group string, song string, id int) error
 	Update(song entity.SongDetails, id int) error
 	GetText(id, page, size int) ([]string, error)
+	GetAllDetails(group, song string) (entity.SongDetails, error)
 }
 
 type SongService struct {
@@ -37,13 +38,13 @@ func (s *SongService) GetSongsPaginated(filter string, page, pageSize int) ([]en
 	return songs[start:end], nil
 }
 
-func (s *SongService) AddSong(song entity.Song) (int, error) {
+func (s *SongService) AddSong(song entity.Song) error {
 	var err error
-	song.ID, err = s.songRepo.Add(song)
+	err = s.songRepo.Add(song)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	return song.ID, nil
+	return nil
 }
 
 func (s *SongService) DeleteSong(group string, song string, id int) error {
@@ -79,4 +80,14 @@ func (s *SongService) GetSongLyricsPaginated(id, page, size int) ([]string, erro
 	}
 
 	return lyrics[start:end], nil
+}
+
+func (s *SongService) GetSongInfo(group, song string) (entity.SongDetails, error) {
+	var songDetails entity.SongDetails
+	var err error
+	songDetails, err = s.songRepo.GetAllDetails(group, song)
+	if err != nil {
+		return songDetails, err
+	}
+	return songDetails, nil
 }

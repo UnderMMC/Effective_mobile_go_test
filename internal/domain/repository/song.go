@@ -18,21 +18,24 @@ func (r *PostgresSongRepository) GetAll(filter string) ([]entity.Song, error) {
 	var songs []entity.Song
 	var rows *sql.Rows
 	var err error
+
 	if filter == "" {
-		rows, err = r.db.Query("SELECT * FROM music")
+		query := `SELECT song_id, performer, song_name, release_date, lyric, link FROM music`
+		rows, err = r.db.Query(query)
 	} else {
-		query := `SELECT * FROM music WHERE CONCAT_WS(' ', song_id::text, performer, song_name, release_data, lyric, link) LIKE '%' || $1 || '%'`
+		query := `SELECT song_id, performer, song_name, release_date, lyric, link FROM music WHERE CONCAT_WS(' ', song_id::text, performer, song_name, release_date, lyric, link) LIKE '%' || $1 || '%'`
 		rows, err = r.db.Query(query, filter)
 	}
 	if err != nil {
 		return nil, err
 	}
+
 	defer rows.Close()
 
 	for rows.Next() {
 		var song entity.Song
-		var songd entity.SongDetails
-		err := rows.Scan(&song.ID, &song.Group, &song.Song, &songd.ReleaseDate, &songd.Text, &songd.Link)
+		var songDetails entity.SongDetails
+		err := rows.Scan(&song.ID, &song.Group, &song.Song, &songDetails.ReleaseDate, &songDetails.Text, &songDetails.Link)
 		if err != nil {
 			return nil, err
 		}
@@ -46,13 +49,14 @@ func (r *PostgresSongRepository) GetAll(filter string) ([]entity.Song, error) {
 	return songs, nil
 }
 
-func (r *PostgresSongRepository) Add(song entity.Song) (int, error) {
-	query := `INSERT INTO music (performer, song_name) VALUES ($1, $2) RETURNING song_id`
-	err := r.db.QueryRow(query, song.Group, song.Song).Scan(&song.ID)
+func (r *PostgresSongRepository) Add(song entity.Song) error {
+	emptyStr := ""
+	query := `INSERT INTO music (performer, song_name, release_date, lyric, link) VALUES ($1, $2, $3, $4, $5)`
+	err := r.db.QueryRow(query, song.Group, song.Song, emptyStr, emptyStr, emptyStr)
 	if err != nil {
-		return 0, err
+		return nil
 	}
-	return song.ID, nil
+	return nil
 }
 
 func (r *PostgresSongRepository) Delete(group string, song string, id int) error {
@@ -65,7 +69,7 @@ func (r *PostgresSongRepository) Delete(group string, song string, id int) error
 }
 
 func (r *PostgresSongRepository) Update(song entity.SongDetails, id int) error {
-	query := `UPDATE music SET release_data = $1, lyric = $2, link = $3 WHERE song_id = $4`
+	query := `UPDATE music SET release_date = $1, lyric = $2, link = $3 WHERE song_id = $4`
 	_, err := r.db.Exec(query, song.ReleaseDate, song.Text, song.Link, id)
 	if err != nil {
 		return err
@@ -94,4 +98,14 @@ func (r *PostgresSongRepository) GetText(id, page, size int) ([]string, error) {
 	}
 
 	return verses[start:end], nil
+}
+
+func (r *PostgresSongRepository) GetAllDetails(group, song string) (entity.SongDetails, error) {
+	var songDetails entity.SongDetails
+	query := `SELECT release_date, lyric, link FROM music WHERE song_name=$1 AND performer=$2`
+	err := r.db.QueryRow(query, song, group).Scan(&songDetails.ReleaseDate, &songDetails.Text, &songDetails.Link)
+	if err != nil {
+		return songDetails, err
+	}
+	return songDetails, nil
 }

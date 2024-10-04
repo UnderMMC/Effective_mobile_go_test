@@ -6,12 +6,17 @@ import (
 	"EffectiveMobile_Go/internal/domain/service"
 	"database/sql"
 	"encoding/json"
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
+	"github.com/pkg/errors"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 )
 
@@ -19,22 +24,15 @@ var db *sql.DB
 
 type SongService interface {
 	GetSongsPaginated(filter string, page, pageSize int) ([]entity.Song, error)
-	AddSong(song entity.Song) (int, error)
+	AddSong(song entity.Song) error
 	DeleteSong(group string, song string, id int) error
 	UpdateSong(song entity.SongDetails, id int) error
 	GetSongLyricsPaginated(id, page, size int) ([]string, error)
+	GetSongInfo(group, song string) (entity.SongDetails, error)
 }
 
 type SongApp struct {
 	serv SongService
-}
-
-var songs = map[string]entity.SongDetails{
-	"Supermassive Black Hole": {
-		ReleaseDate: "16.07.2006",
-		Text:        "Ooh baby, don't you know I suffer?\nOoh baby, can you hear me moan?\nYou caught me under false pretenses\nHow long before you let me go?\n\nOoh\nYou set my soul alight\nOoh\nYou set my soul alight",
-		Link:        "https://www.youtube.com/watch?v=Xsp3_a-PMTw",
-	},
 }
 
 func (a *SongApp) GetSongsHandler(w http.ResponseWriter, r *http.Request) {
@@ -81,7 +79,7 @@ func (a *SongApp) AddSongHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		return
 	}
-	song.ID, err = a.serv.AddSong(song)
+	err = a.serv.AddSong(song)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -104,11 +102,6 @@ func (a *SongApp) AddSongHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		http.Error(w, "Song not found", http.StatusNotFound)
-		return
-	}
-
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -129,16 +122,17 @@ func (a *SongApp) InfoSongHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
-
-	// Проверяем, существует ли песня в карте.
-	songDetail, exists := songs[song]
-	if !exists {
-		http.Error(w, "Song not found", http.StatusNotFound)
+	var songDetails entity.SongDetails
+	var err error
+	songDetails, err = a.serv.GetSongInfo(group, song)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		log.Println(err)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(songDetail); err != nil {
+	if err := json.NewEncoder(w).Encode(songDetails); err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		log.Println(err)
 		return
@@ -164,7 +158,7 @@ func (a *SongApp) UpdateSongHandler(w http.ResponseWriter, r *http.Request) {
 	var song entity.SongDetails
 	idStr := r.URL.Query().Get("id")
 	id, _ := strconv.Atoi(idStr)
-	if id == 0 || id < 0 {
+	if id <= 0 {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 	}
 	err := json.NewDecoder(r.Body).Decode(&song)
@@ -218,13 +212,18 @@ func New() *SongApp {
 }
 
 func (a *SongApp) Run() {
-	defer db.Close()
 	var err error
 	connStr := "user=postgres password=pgpwd4habr dbname=postgres sslmode=disable"
 	db, err = sql.Open("postgres", connStr)
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer db.Close()
+
+	if err := migrateDB(); err != nil {
+		log.Fatalf("Migration failed: %v", err)
+	}
+
 	r := mux.NewRouter()
 
 	SongRepo := repository.NewPostgresSongRepository(db)
@@ -240,4 +239,32 @@ func (a *SongApp) Run() {
 
 	log.Println("Starting HTTP server on port :8080")
 	log.Fatal(http.ListenAndServe(":8080", r))
+}
+
+func migrateDB() error {
+	currentDir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	migrationsDir := currentDir + "/migrations"
+
+	// Создаем новое соединение с базой данных
+	dbDriver, err := postgres.WithInstance(db, &postgres.Config{})
+	if err != nil {
+		return err
+	}
+
+	// Создаем новый мигратор
+	m, err := migrate.NewWithDatabaseInstance(
+		"file://"+migrationsDir,
+		"postgres", dbDriver)
+	if err != nil {
+		return err
+	}
+
+	// Выполняем миграции
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		return err
+	}
+	return nil
 }
