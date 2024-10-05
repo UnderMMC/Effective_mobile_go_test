@@ -3,6 +3,7 @@ package repository
 import (
 	"EffectiveMobile_Go/internal/domain/entity"
 	"database/sql"
+	_ "github.com/lib/pq"
 	"strings"
 )
 

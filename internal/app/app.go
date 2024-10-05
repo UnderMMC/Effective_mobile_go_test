@@ -10,6 +10,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
+	"go.uber.org/zap"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -30,7 +31,8 @@ type SongService interface {
 }
 
 type SongApp struct {
-	serv SongService
+	serv   SongService
+	logger *zap.Logger
 }
 
 func (a *SongApp) GetSongsHandler(w http.ResponseWriter, r *http.Request) {
@@ -47,17 +49,19 @@ func (a *SongApp) GetSongsHandler(w http.ResponseWriter, r *http.Request) {
 	if pageStr != "" {
 		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
 			page = p
+			a.logger.Debug("Page set", zap.Int("page", page))
 		}
 	}
 	if pageSizeStr != "" {
 		if ps, err := strconv.Atoi(pageSizeStr); err == nil && ps > 0 {
 			pageSize = ps
+			a.logger.Debug("Page size set", zap.Int("pageSize", pageSize))
 		}
 	}
 
 	songs, err := a.serv.GetSongsPaginated(filter, page, pageSize)
 	if err != nil {
-		log.Println(err)
+		a.logger.Error("Error fetching songs", zap.Error(err))
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -65,7 +69,7 @@ func (a *SongApp) GetSongsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	if err := json.NewEncoder(w).Encode(songs); err != nil {
-		log.Println(err)
+		a.logger.Error("Failed to encode response", zap.Error(err))
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}
 }
@@ -74,36 +78,38 @@ func (a *SongApp) AddSongHandler(w http.ResponseWriter, r *http.Request) {
 	var song entity.Song
 	err := json.NewDecoder(r.Body).Decode(&song)
 	if err != nil {
+		a.logger.Warn("Bad request", zap.Error(err))
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		return
 	}
 	err = a.serv.AddSong(song)
 	if err != nil {
+		a.logger.Error("Internal server error while adding song", zap.Error(err))
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	if song.Group == "" || song.Song == "" {
+		a.logger.Warn("Group or Song cannot be empty")
 		http.Error(w, "Group or Song cannot be empty", http.StatusBadRequest)
 		return
 	}
 
-	// Кодирование параметров для URL
 	groupEncoded := url.QueryEscape(song.Group)
 	songEncoded := url.QueryEscape(song.Song)
 
 	resp, err := http.Get("http://localhost:8080/songs/info?group=" + groupEncoded + "&song=" + songEncoded)
 	if err != nil {
+		a.logger.Error("Failed to fetch song info", zap.Error(err))
 		http.Error(w, "Failed to fetch song info", http.StatusInternalServerError)
-		log.Println(err)
 		return
 	}
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
+		a.logger.Error("Internal Server Error while reading response body", zap.Error(err))
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		log.Println(err)
 		return
 	}
 
@@ -117,22 +123,24 @@ func (a *SongApp) InfoSongHandler(w http.ResponseWriter, r *http.Request) {
 	song := r.URL.Query().Get("song")
 
 	if group == "" || song == "" {
+		a.logger.Warn("Bad Request: group or song is empty")
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 	var songDetails entity.SongDetails
 	var err error
+
 	songDetails, err = a.serv.GetSongInfo(group, song)
 	if err != nil {
+		a.logger.Error("Internal server error while fetching song info", zap.Error(err))
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		log.Println(err)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(songDetails); err != nil {
+		a.logger.Error("Internal Server Error while encoding response", zap.Error(err))
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		log.Println(err)
 		return
 	}
 }
@@ -142,13 +150,16 @@ func (a *SongApp) DeleteSongHandler(w http.ResponseWriter, r *http.Request) {
 	song := r.URL.Query().Get("song")
 	idStr := r.URL.Query().Get("id")
 	id, _ := strconv.Atoi(idStr)
-	if group == "" || song == "" || id == 0 || id < 0 {
+	if group == "" || song == "" || id <= 0 {
+		a.logger.Warn("Bad Request: group or song is empty")
 		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
 	}
 	err := a.serv.DeleteSong(group, song, id)
 	if err != nil {
+		a.logger.Warn("Bad Request: invalid parameters")
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		log.Println(err)
+		return
 	}
 }
 
@@ -156,27 +167,31 @@ func (a *SongApp) UpdateSongHandler(w http.ResponseWriter, r *http.Request) {
 	var song entity.SongDetails
 	idStr := r.URL.Query().Get("id")
 	id, _ := strconv.Atoi(idStr)
+
 	if id <= 0 {
+		a.logger.Warn("Bad Request: invalid song ID")
 		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
 	}
 	err := json.NewDecoder(r.Body).Decode(&song)
 	if err != nil {
+		a.logger.Warn("Bad request while decoding song", zap.Error(err))
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		return
 	}
 
 	err = a.serv.UpdateSong(song, id)
 	if err != nil {
+		a.logger.Error("Internal server error while updating song", zap.Error(err))
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		log.Println(err)
 	}
 
+	a.logger.Info("Song updated successfully")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Song updated successfully"))
 }
 
 func (a *SongApp) GetTextHandler(w http.ResponseWriter, r *http.Request) {
-	//var err error
 	idStr := r.URL.Query().Get("id")
 	pageStr := r.URL.Query().Get("page")
 	sizeStr := r.URL.Query().Get("size")
@@ -186,27 +201,28 @@ func (a *SongApp) GetTextHandler(w http.ResponseWriter, r *http.Request) {
 	size, _ := strconv.Atoi(sizeStr)
 
 	if id <= 0 || page < 0 || size <= 0 {
+		a.logger.Warn("Bad Request: invalid parameters")
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
-	//var text []string
 	text, err := a.serv.GetSongLyricsPaginated(id, page, size)
 	if err != nil {
+		a.logger.Error("Internal server error while fetching lyrics", zap.Error(err))
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		log.Println(err)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(text); err != nil {
-		log.Println(err)
+		a.logger.Error("Failed to encode response", zap.Error(err))
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}
 }
 
 func New() *SongApp {
-	return &SongApp{}
+	logger, _ := zap.NewProduction()
+	return &SongApp{logger: logger}
 }
 
 func (a *SongApp) Run() {
@@ -214,7 +230,7 @@ func (a *SongApp) Run() {
 
 	err = godotenv.Load()
 	if err != nil {
-		log.Fatal("Ошибка загрузки .env файла")
+		a.logger.Fatal("Ошибка загрузки .env файла", zap.Error(err))
 	}
 
 	connStr := "user=" + os.Getenv("DB_USER") +
@@ -224,7 +240,7 @@ func (a *SongApp) Run() {
 
 	db, err = sql.Open("postgres", connStr)
 	if err != nil {
-		log.Fatal(err)
+		a.logger.Fatal("Failed to connect to database", zap.Error(err))
 	}
 	defer db.Close()
 
@@ -241,6 +257,6 @@ func (a *SongApp) Run() {
 	r.HandleFunc(os.Getenv("UPDATE_SONG_ROUTE"), a.UpdateSongHandler).Methods("POST")
 	r.HandleFunc(os.Getenv("TEXT_ROUTE"), a.GetTextHandler).Methods("GET")
 
-	log.Printf("Starting HTTP server on port %s", os.Getenv("HTTP_SERVER_PORT"))
+	a.logger.Info("Starting HTTP server", zap.String("port", os.Getenv("HTTP_SERVER_PORT")))
 	log.Fatal(http.ListenAndServe(":"+os.Getenv("HTTP_SERVER_PORT"), r))
 }
