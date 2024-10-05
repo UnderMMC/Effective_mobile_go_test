@@ -1,15 +1,18 @@
 MIGRATIONS_DIR=migrations
-DB_URL=postgres://postgres:pgpwd4habr@localhost/postgres?sslmode=disable
+DB_URL=postgres://postgres:pgpwd4habr@localhost:5432/postgres?sslmode=disable
 
-.PHONY: migrateup migratedown
+.PHONY: up down run
 
-migrateup:
+up:
 	@echo "Запуск миграций базы данных..."
 	migrate -path $(MIGRATIONS_DIR) -database "$(DB_URL)" up
 
-migratedown:
+down:
 	@echo "Откат последней миграции базы данных..."
 	migrate -path $(MIGRATIONS_DIR) -database "$(DB_URL)" down
 
 run:
+	@echo "Применение миграций базы данных..."
+	migrate -path $(MIGRATIONS_DIR) -database "$(DB_URL)" up
+	@echo "Запуск сервиса..."
 	go run cmd/sum/main.go

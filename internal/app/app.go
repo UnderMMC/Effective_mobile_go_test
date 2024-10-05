@@ -45,9 +45,6 @@ func (a *SongApp) GetSongsHandler(w http.ResponseWriter, r *http.Request) {
 	pageStr := r.URL.Query().Get("page")
 	pageSizeStr := r.URL.Query().Get("pageSize")
 
-	//page := 1     // значение по умолчанию
-	//pageSize := 5 // значение по умолчанию
-
 	if pageStr != "" {
 		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
 			page = p
@@ -117,33 +114,6 @@ func (a *SongApp) AddSongHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(body)
-}
-
-func (a *SongApp) InfoSongHandler(w http.ResponseWriter, r *http.Request) {
-	group := r.URL.Query().Get("group")
-	song := r.URL.Query().Get("song")
-
-	if group == "" || song == "" {
-		a.logger.Warn("Bad Request: group or song is empty")
-		http.Error(w, "Bad Request", http.StatusBadRequest)
-		return
-	}
-	var songDetails entity.SongDetails
-	var err error
-
-	songDetails, err = a.serv.GetSongInfo(group, song)
-	if err != nil {
-		a.logger.Error("Internal server error while fetching song info", zap.Error(err))
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(songDetails); err != nil {
-		a.logger.Error("Internal Server Error while encoding response", zap.Error(err))
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
 }
 
 func (a *SongApp) DeleteSongHandler(w http.ResponseWriter, r *http.Request) {
@@ -221,6 +191,33 @@ func (a *SongApp) GetTextHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (a *SongApp) InfoSongHandler(w http.ResponseWriter, r *http.Request) {
+	group := r.URL.Query().Get("group")
+	song := r.URL.Query().Get("song")
+
+	if group == "" || song == "" {
+		a.logger.Warn("Bad Request: group or song is empty")
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+	var songDetails entity.SongDetails
+	var err error
+
+	songDetails, err = a.serv.GetSongInfo(group, song)
+	if err != nil {
+		a.logger.Error("Internal server error while fetching song info", zap.Error(err))
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(songDetails); err != nil {
+		a.logger.Error("Internal Server Error while encoding response", zap.Error(err))
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+}
+
 func New() *SongApp {
 	logger, _ := zap.NewProduction()
 	return &SongApp{logger: logger}
@@ -253,10 +250,10 @@ func (a *SongApp) Run() {
 
 	r.HandleFunc(os.Getenv("SONG_ROUTE"), a.GetSongsHandler).Methods("GET")
 	r.HandleFunc(os.Getenv("ADD_SONG_ROUTE"), a.AddSongHandler).Methods("POST")
-	r.HandleFunc(os.Getenv("INFO_SONG_ROUTE"), a.InfoSongHandler).Methods("GET")
-	r.HandleFunc(os.Getenv("DELETE_SONG_ROUTE"), a.DeleteSongHandler).Methods("GET")
-	r.HandleFunc(os.Getenv("UPDATE_SONG_ROUTE"), a.UpdateSongHandler).Methods("POST")
+	r.HandleFunc(os.Getenv("DELETE_SONG_ROUTE"), a.DeleteSongHandler).Methods("DELETE")
+	r.HandleFunc(os.Getenv("UPDATE_SONG_ROUTE"), a.UpdateSongHandler).Methods("PUT")
 	r.HandleFunc(os.Getenv("TEXT_ROUTE"), a.GetTextHandler).Methods("GET")
+	r.HandleFunc(os.Getenv("INFO_SONG_ROUTE"), a.InfoSongHandler).Methods("GET")
 
 	a.logger.Info("Starting HTTP server", zap.String("port", os.Getenv("HTTP_SERVER_PORT")))
 	log.Fatal(http.ListenAndServe(":"+os.Getenv("HTTP_SERVER_PORT"), r))
