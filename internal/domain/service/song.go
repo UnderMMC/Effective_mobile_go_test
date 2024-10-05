@@ -36,6 +36,7 @@ func (s *SongService) GetSongsPaginated(filter string, page, pageSize int) ([]en
 	}
 
 	return songs[start:end], nil
+
 }
 
 func (s *SongService) AddSong(song entity.Song) error {

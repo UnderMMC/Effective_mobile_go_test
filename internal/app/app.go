@@ -20,6 +20,8 @@ import (
 )
 
 var db *sql.DB
+var page int = 1
+var pageSize int = 5
 
 type SongService interface {
 	GetSongsPaginated(filter string, page, pageSize int) ([]entity.Song, error)
@@ -43,8 +45,8 @@ func (a *SongApp) GetSongsHandler(w http.ResponseWriter, r *http.Request) {
 	pageStr := r.URL.Query().Get("page")
 	pageSizeStr := r.URL.Query().Get("pageSize")
 
-	page := 1
-	pageSize := 5
+	//page := 1     // значение по умолчанию
+	//pageSize := 5 // значение по умолчанию
 
 	if pageStr != "" {
 		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
@@ -61,8 +63,7 @@ func (a *SongApp) GetSongsHandler(w http.ResponseWriter, r *http.Request) {
 
 	songs, err := a.serv.GetSongsPaginated(filter, page, pageSize)
 	if err != nil {
-		a.logger.Error("Error fetching songs", zap.Error(err))
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 

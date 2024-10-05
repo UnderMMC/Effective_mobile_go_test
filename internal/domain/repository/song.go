@@ -21,10 +21,14 @@ func (r *PostgresSongRepository) GetAll(filter string) ([]entity.Song, error) {
 	var err error
 
 	if filter == "" {
-		query := `SELECT song_id, performer, song_name, release_date, lyric, link FROM music`
+		query := `SELECT song_id, performer, song_name, release_date, lyric, link 
+				  FROM music`
 		rows, err = r.db.Query(query)
 	} else {
-		query := `SELECT song_id, performer, song_name, release_date, lyric, link FROM music WHERE CONCAT_WS(' ', song_id::text, performer, song_name, release_date, lyric, link) LIKE '%' || $1 || '%'`
+		query := `SELECT song_id, performer, song_name, release_date, lyric, link
+				  FROM music 
+				  WHERE CONCAT_WS(' ', song_id::text, performer, song_name, release_date, lyric, link) 
+				  LIKE '%' || $1 || '%'`
 		rows, err = r.db.Query(query, filter)
 	}
 	if err != nil {
