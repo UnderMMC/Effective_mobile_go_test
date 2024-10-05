@@ -6,12 +6,10 @@ import (
 	"EffectiveMobile_Go/internal/domain/service"
 	"database/sql"
 	"encoding/json"
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
-	"github.com/pkg/errors"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -213,16 +211,22 @@ func New() *SongApp {
 
 func (a *SongApp) Run() {
 	var err error
-	connStr := "user=postgres password=pgpwd4habr dbname=postgres sslmode=disable"
+
+	err = godotenv.Load()
+	if err != nil {
+		log.Fatal("Ошибка загрузки .env файла")
+	}
+
+	connStr := "user=" + os.Getenv("DB_USER") +
+		" password=" + os.Getenv("DB_PASSWORD") +
+		" dbname=" + os.Getenv("DB_NAME") +
+		" sslmode=" + os.Getenv("DB_SSLMODE")
+
 	db, err = sql.Open("postgres", connStr)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close()
-
-	if err := migrateDB(); err != nil {
-		log.Fatalf("Migration failed: %v", err)
-	}
 
 	r := mux.NewRouter()
 
@@ -230,41 +234,13 @@ func (a *SongApp) Run() {
 	SongServ := service.NewSongService(SongRepo)
 	a.serv = SongServ
 
-	r.HandleFunc("/songs", a.GetSongsHandler).Methods("GET")
-	r.HandleFunc("/songs/add", a.AddSongHandler).Methods("POST")
-	r.HandleFunc("/songs/info", a.InfoSongHandler).Methods("GET")
-	r.HandleFunc("/songs/delete", a.DeleteSongHandler).Methods("GET")
-	r.HandleFunc("/songs/update", a.UpdateSongHandler).Methods("POST")
-	r.HandleFunc("/songs/text", a.GetTextHandler).Methods("GET")
+	r.HandleFunc(os.Getenv("SONG_ROUTE"), a.GetSongsHandler).Methods("GET")
+	r.HandleFunc(os.Getenv("ADD_SONG_ROUTE"), a.AddSongHandler).Methods("POST")
+	r.HandleFunc(os.Getenv("INFO_SONG_ROUTE"), a.InfoSongHandler).Methods("GET")
+	r.HandleFunc(os.Getenv("DELETE_SONG_ROUTE"), a.DeleteSongHandler).Methods("GET")
+	r.HandleFunc(os.Getenv("UPDATE_SONG_ROUTE"), a.UpdateSongHandler).Methods("POST")
+	r.HandleFunc(os.Getenv("TEXT_ROUTE"), a.GetTextHandler).Methods("GET")
 
-	log.Println("Starting HTTP server on port :8080")
-	log.Fatal(http.ListenAndServe(":8080", r))
-}
-
-func migrateDB() error {
-	currentDir, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-	migrationsDir := currentDir + "/migrations"
-
-	// Создаем новое соединение с базой данных
-	dbDriver, err := postgres.WithInstance(db, &postgres.Config{})
-	if err != nil {
-		return err
-	}
-
-	// Создаем новый мигратор
-	m, err := migrate.NewWithDatabaseInstance(
-		"file://"+migrationsDir,
-		"postgres", dbDriver)
-	if err != nil {
-		return err
-	}
-
-	// Выполняем миграции
-	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		return err
-	}
-	return nil
+	log.Printf("Starting HTTP server on port %s", os.Getenv("HTTP_SERVER_PORT"))
+	log.Fatal(http.ListenAndServe(":"+os.Getenv("HTTP_SERVER_PORT"), r))
 }
