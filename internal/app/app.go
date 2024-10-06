@@ -35,6 +35,7 @@ type SongService interface {
 type SongApp struct {
 	serv   SongService
 	logger *zap.Logger
+	db     *sql.DB
 }
 
 func (a *SongApp) GetSongsHandler(w http.ResponseWriter, r *http.Request) {
@@ -132,10 +133,12 @@ func (a *SongApp) DeleteSongHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Song deleted successfully"))
 }
 
 func (a *SongApp) UpdateSongHandler(w http.ResponseWriter, r *http.Request) {
-	var song entity.SongDetails
+	var songDetails entity.SongDetails
 	idStr := r.URL.Query().Get("id")
 	id, _ := strconv.Atoi(idStr)
 
@@ -144,14 +147,14 @@ func (a *SongApp) UpdateSongHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
-	err := json.NewDecoder(r.Body).Decode(&song)
+	err := json.NewDecoder(r.Body).Decode(&songDetails)
 	if err != nil {
 		a.logger.Warn("Bad request while decoding song", zap.Error(err))
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		return
 	}
 
-	err = a.serv.UpdateSong(song, id)
+	err = a.serv.UpdateSong(songDetails, id)
 	if err != nil {
 		a.logger.Error("Internal server error while updating song", zap.Error(err))
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -244,8 +247,8 @@ func (a *SongApp) Run() {
 
 	r := mux.NewRouter()
 
-	SongRepo := repository.NewPostgresSongRepository(db)
-	SongServ := service.NewSongService(SongRepo)
+	SongRepo := repository.NewPostgresSongRepository(db, a.logger)
+	SongServ := service.NewSongService(SongRepo, a.logger)
 	a.serv = SongServ
 
 	r.HandleFunc(os.Getenv("SONG_ROUTE"), a.GetSongsHandler).Methods("GET")

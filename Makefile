@@ -12,7 +12,7 @@ down:
 	migrate -path $(MIGRATIONS_DIR) -database "$(DB_URL)" down
 
 run:
-	@echo "Применение миграций базы данных..."
+	@echo "Запуск миграций базы данных..."
 	migrate -path $(MIGRATIONS_DIR) -database "$(DB_URL)" up
 	@echo "Запуск сервиса..."
 	go run cmd/sum/main.go
