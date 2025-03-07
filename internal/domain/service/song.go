@@ -5,6 +5,8 @@ import (
 	"go.uber.org/zap"
 )
 
+//go:generate mockery --with-expecter --case=underscore --name=SongRepository
+
 type SongRepository interface {
 	GetAll(filter string) ([]entity.Song, error)
 	Add(song entity.Song) error
@@ -67,18 +69,6 @@ func (s *SongService) DeleteSong(group string, song string, id int) error {
 		return err
 	}
 	s.logger.Info("Song deleted successfully", zap.String("group", group), zap.String("song", song))
-	return nil
-}
-
-func (s *SongService) UpdateSong(song entity.SongDetails, id int) error {
-	s.logger.Debug("Updating song", zap.Any("song", song), zap.Int("id", id))
-
-	err := s.songRepo.Update(song, id)
-	if err != nil {
-		s.logger.Error("Failed to update song", zap.Error(err))
-		return err
-	}
-	s.logger.Info("Song updated successfully", zap.Int("id", id))
 	return nil
 }
 
